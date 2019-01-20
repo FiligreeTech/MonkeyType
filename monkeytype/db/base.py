@@ -7,7 +7,9 @@ from abc import (
     ABCMeta,
     abstractmethod,
 )
+from collections import OrderedDict
 from typing import (
+    Dict,
     Iterable,
     List,
     Optional,
@@ -66,14 +68,22 @@ class CallTraceStore(metaclass=ABCMeta):
 
 class CallTraceStoreLogger(CallTraceLogger):
     """A CallTraceLogger that stores logged traces in a CallTraceStore."""
+
+    flush_interval = 1 << 15
+
     def __init__(self, store: CallTraceStore) -> None:
         self.store = store
-        self.traces: List[CallTrace] = []
+        self.traces: Dict[CallTrace, None] = OrderedDict()
 
     def log(self, trace: CallTrace) -> None:
-        if not trace.func.__module__ == '__main__':
-            self.traces.append(trace)
+        if trace.func.__module__ == '__main__':
+            return
+
+        self.traces.setdefault(trace, None)
+
+        if len(self.traces) == self.flush_interval:
+            self.flush()
 
     def flush(self) -> None:
         self.store.add(self.traces)
-        self.traces = []
+        self.traces.clear()
